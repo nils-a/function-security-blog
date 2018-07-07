@@ -13,10 +13,10 @@ namespace Sample2.UserInfo.UI
         internal async Task<string> Call(string functionUrl)
         {
             // Step 1:
-            var microsoftSession = await AuthenticateToProvider();
+            var providerToken = await AuthenticateToProvider();
 
             // Step 2:
-            var easyAuthToken = await AuthenticateToAzure(functionUrl, microsoftSession);
+            var easyAuthToken = await AuthenticateToAzure(functionUrl, providerToken);
 
             //
             // Step3: Use the token we got from "EasyAuth" 
@@ -29,7 +29,7 @@ namespace Sample2.UserInfo.UI
             }
         }
 
-        private async Task<string> AuthenticateToAzure(string function, AccountSession microsoftSession)
+        private async Task<string> AuthenticateToAzure(string function, string accessToken)
         {
             using (var client = new HttpClient())
             {
@@ -38,7 +38,7 @@ namespace Sample2.UserInfo.UI
                 var request = new HttpRequestMessage(HttpMethod.Post, AzureLoginUrl);
                 var reqJson = new JObject
                 {
-                    ["access_token"] = microsoftSession.AccessToken
+                    ["access_token"] = accessToken
                 };
                 request.Content = new StringContent(reqJson.ToString());
                 request.Content.Headers.ContentType.MediaType = "application/json";
@@ -56,7 +56,7 @@ namespace Sample2.UserInfo.UI
             }
         }
 
-        private async Task<AccountSession> AuthenticateToProvider()
+        private async Task<string> AuthenticateToProvider()
         {
             const string clientId = "1e872776-dbba-47e5-8035-3e2e4ab8a4e6"; // register this under https://apps.dev.microsoft.com/
             var authenticationProvider = new MsaAuthenticationProvider(
@@ -65,14 +65,10 @@ namespace Sample2.UserInfo.UI
                     new string[] { "wl.signin", "wl.basic" },               // https://docs.microsoft.com/en-us/previous-versions/office/developer/onedrive-live-sdk-reference/dn631845(v=office.15)
                     new CredentialVault(clientId));
 
-            if (authenticationProvider.IsAuthenticated)
-            {
-                // probably never in this setup...
-                return authenticationProvider.CurrentAccountSession;
-            }
-
+            //TODO: In real app there are many more tests needed. 
+            // e.g. it is possible the restored Session from cache is valid but the attached accesstoken is already expired...
             await authenticationProvider.RestoreMostRecentFromCacheOrAuthenticateUserAsync();
-            return authenticationProvider.CurrentAccountSession;
+            return authenticationProvider.CurrentAccountSession.AccessToken;
         }
 
     }
